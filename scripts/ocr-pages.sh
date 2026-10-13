@@ -24,7 +24,7 @@ for ((p = START; p <= END; p++)); do
   tesseract "$img" "$TMP/$n" -l urd --psm 6 >/dev/null 2>&1
   node -e '
     const fs=require("fs");
-    const [,, txt, vol, page, out]=process.argv;
+    const [txt, vol, page, out]=process.argv.slice(1);
     const paragraphs=fs.readFileSync(txt,"utf8").split(/\n\s*\n/)
       .map(s=>s.replace(/\s*\n\s*/g," ").trim()).filter(Boolean);
     fs.writeFileSync(out, JSON.stringify({volume:+vol,page:+page,proofread:false,paragraphs,footnotes:[]},null,2));
