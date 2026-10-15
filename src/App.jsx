@@ -248,14 +248,6 @@ export default function App() {
         >
           ← Previous
         </button>
-        <button
-          className="btn"
-          onClick={() => go(loc.vol, prevText)}
-          disabled={prevText === undefined}
-          title="Previous page with typed text"
-        >
-          ⇤ Text
-        </button>
         <label>
           Page
           <input
@@ -267,14 +259,6 @@ export default function App() {
           />
           / {volume.pages - 1}
         </label>
-        <button
-          className="btn"
-          onClick={() => go(loc.vol, nextText)}
-          disabled={nextText === undefined}
-          title="Next page with typed text"
-        >
-          Text ⇥
-        </button>
         <button
           className="btn"
           onClick={() => go(loc.vol, loc.page + 1)}
@@ -297,6 +281,7 @@ function usePlayer(loc, sentences) {
   const [voices, setVoices] = useState([]);
   const [voiceName, setVoiceName] = useState("");
   const [hasAudio, setHasAudio] = useState(false);
+  const [timing, setTiming] = useState(null); // [{s, d}] per sentence
   const [note, setNote] = useState("");
   const audioRef = useRef(null);
   const runRef = useRef(0);
@@ -331,15 +316,23 @@ function usePlayer(loc, sentences) {
     stop();
     setNote("");
     setHasAudio(false);
+    setTiming(null);
     let cancelled = false;
-    fetch(audioUrl(loc.vol, loc.page), { method: "HEAD" })
-      .then(
-        (r) =>
-          !cancelled &&
-          setHasAudio(
-            r.ok && (r.headers.get("content-type") || "").startsWith("audio"),
-          ),
-      )
+    const mp3 = audioUrl(loc.vol, loc.page);
+    fetch(mp3, { method: "HEAD" })
+      .then((r) => {
+        if (cancelled) return;
+        const ok = r.ok && (r.headers.get("content-type") || "").startsWith("audio");
+        setHasAudio(ok);
+        if (ok) {
+          // Try to load sentence-timing JSON alongside the MP3.
+          const timingUrl = mp3.replace(/\.mp3$/, ".json");
+          fetch(timingUrl)
+            .then((r2) => r2.ok ? r2.json() : null)
+            .then((t) => { if (!cancelled) setTiming(t); })
+            .catch(() => {});
+        }
+      })
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -390,11 +383,32 @@ function usePlayer(loc, sentences) {
     const a = new Audio(audioUrl(loc.vol, loc.page));
     a.playbackRate = rate;
     a.onended = stop;
+    // Word-level highlighting using sentence timing JSON.
+    if (timing && timing.length > 0) {
+      a.ontimeupdate = () => {
+        const t = a.currentTime;
+        // Find the current sentence.
+        let si = timing.length - 1;
+        for (let i = 0; i < timing.length; i++) {
+          if (t < timing[i].s + timing[i].d) { si = i; break; }
+        }
+        setCurrent(si);
+        // Estimate word position proportionally within the sentence.
+        const entry = timing[si];
+        const words = sentences[si]?.split(" ") ?? [];
+        if (words.length > 1 && entry.d > 0) {
+          const progress = Math.max(0, t - entry.s) / entry.d;
+          setWord(Math.min(words.length - 1, Math.floor(progress * words.length)));
+        } else {
+          setWord(0);
+        }
+      };
+    }
     audioRef.current = a;
     a.play()
       .then(() => setState("playing"))
       .catch(stop);
-  }, [hasAudio, speakFrom, stop, loc, rate]);
+  }, [hasAudio, speakFrom, stop, loc, rate, timing, sentences]);
 
   const toggle = useCallback(() => {
     const a = audioRef.current;
