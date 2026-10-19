@@ -25,10 +25,21 @@ def get_duration(mp3_path):
     )
     return float(r.stdout.strip())
 
-async def synthesise(text, out_path):
-    import edge_tts
-    c = edge_tts.Communicate(text, VOICE)
-    await c.save(out_path)
+async def synthesise(text, out_path, retries=4):
+    import asyncio, edge_tts
+    delay = 5
+    for attempt in range(retries):
+        try:
+            c = edge_tts.Communicate(text, VOICE)
+            await c.save(out_path)
+            return
+        except Exception as e:
+            if attempt < retries - 1:
+                print(f"  retry ({e.__class__.__name__}), waiting {delay}s…")
+                await asyncio.sleep(delay)
+                delay *= 2
+            else:
+                raise
 
 async def main():
     if len(sys.argv) != 3:
@@ -100,8 +111,7 @@ async def main():
                 print(f"  WARN: sentence {pos+1} failed ({e.__class__.__name__}), skipping")
 
         if not sent_files:
-            print(f"SKIP (all sentences failed) vol{vol}/{page_str}")
-            skip_marker.touch()
+            print(f"SKIP (all sentences failed, no .skip written) vol{vol}/{page_str}")
             sys.exit(0)
 
         # Build timing data from individual durations.
