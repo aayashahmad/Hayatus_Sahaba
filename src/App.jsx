@@ -92,7 +92,11 @@ export default function App() {
     [blocks],
   );
 
-  const player = usePlayer(loc, sentences);
+  const onPageEnd = useCallback(() => {
+    go(loc.vol, loc.page + 1);
+  }, [go, loc]);
+
+  const player = usePlayer(loc, sentences, onPageEnd);
   const showScan = mode === "scan" || !hasText;
 
   return (
@@ -178,8 +182,17 @@ export default function App() {
       </div>
 
       {player.note && <p className="note">{player.note}</p>}
+      {!player.canPlay && hasText && (
+        <p className="note">
+          🔇 Listen is not available for this page.{" "}
+          {player.voices.length === 0
+            ? "Your browser has no Urdu voice — open in Microsoft Edge or Android Chrome."
+            : "This page's audio recording is not ready yet."}
+        </p>
+      )}
 
       <main className="page">
+        <div key={`${loc.vol}-${loc.page}`} className="page-content">
         {showScan ? (
           <>
             {!hasText && available && (
@@ -238,6 +251,7 @@ export default function App() {
             )}
           </>
         )}
+        </div>
       </main>
 
       <footer className="pager">
@@ -273,11 +287,11 @@ export default function App() {
 
 // Plays a recorded recitation (public/audio/volN/NNNN.mp3) when one exists,
 // otherwise reads the page text with the device's Urdu voice.
-function usePlayer(loc, sentences) {
+function usePlayer(loc, sentences, onPageEnd) {
   const [state, setState] = useState("idle"); // 'idle' | 'playing' | 'paused'
   const [current, setCurrent] = useState(-1);
   const [word, setWord] = useState(-1);
-  const [rate, setRate] = useState(0.9);
+  const [rate, setRate] = useState(1);
   const [voices, setVoices] = useState([]);
   const [voiceName, setVoiceName] = useState("");
   const [hasAudio, setHasAudio] = useState(false);
@@ -309,6 +323,7 @@ function usePlayer(loc, sentences) {
     setState("idle");
     setCurrent(-1);
     setWord(-1);
+    setNote("");
   }, [synth]);
 
   // Stop on page change and look for a recording of the new page.
@@ -343,6 +358,7 @@ function usePlayer(loc, sentences) {
 
   const speakFrom = useCallback(
     (start) => {
+      if (sentences.length === 0) return;
       const voice = voices.find((v) => v.name === voiceName) ?? voices[0];
       if (!synth || !voice) {
         setNote(
@@ -356,7 +372,7 @@ function usePlayer(loc, sentences) {
       // One utterance per sentence: long utterances get cut off in Chrome.
       const next = (i) => {
         if (run !== runRef.current) return;
-        if (i >= sentences.length) return stop();
+        if (i >= sentences.length) { stop(); onPageEnd?.(); return; }
         setCurrent(i);
         setWord(-1);
         const u = new SpeechSynthesisUtterance(sentences[i]);
@@ -374,7 +390,7 @@ function usePlayer(loc, sentences) {
       };
       next(start);
     },
-    [synth, voices, voiceName, rate, sentences, stop],
+    [synth, voices, voiceName, rate, sentences, stop, onPageEnd],
   );
 
   const play = useCallback(() => {
@@ -382,7 +398,7 @@ function usePlayer(loc, sentences) {
     stop();
     const a = new Audio(audioUrl(loc.vol, loc.page));
     a.playbackRate = rate;
-    a.onended = stop;
+    a.onended = () => { stop(); onPageEnd?.(); };
     // Word-level highlighting using sentence timing JSON.
     if (timing && timing.length > 0) {
       a.ontimeupdate = () => {
@@ -395,10 +411,20 @@ function usePlayer(loc, sentences) {
         setCurrent(si);
         // Estimate word position proportionally within the sentence.
         const entry = timing[si];
-        const words = sentences[si]?.split(" ") ?? [];
+        const words = sentences[si]?.split(" ").filter(Boolean) ?? [];
         if (words.length > 1 && entry.d > 0) {
-          const progress = Math.max(0, t - entry.s) / entry.d;
-          setWord(Math.min(words.length - 1, Math.floor(progress * words.length)));
+          const relT = Math.max(0, t - entry.s);
+          // Weight each word by its character count — longer words take more time.
+          const charCounts = words.map((w) => Math.max(1, w.length));
+          const total = charCounts.reduce((a, b) => a + b, 0);
+          let cum = 0;
+          let wi = words.length - 1;
+          for (let j = 0; j < words.length; j++) {
+            const wordEnd = ((cum + charCounts[j]) / total) * entry.d;
+            if (relT < wordEnd) { wi = j; break; }
+            cum += charCounts[j];
+          }
+          setWord(wi);
         } else {
           setWord(0);
         }
@@ -408,7 +434,7 @@ function usePlayer(loc, sentences) {
     a.play()
       .then(() => setState("playing"))
       .catch(stop);
-  }, [hasAudio, speakFrom, stop, loc, rate, timing, sentences]);
+  }, [hasAudio, speakFrom, stop, loc, rate, timing, sentences, onPageEnd]);
 
   const toggle = useCallback(() => {
     const a = audioRef.current;
@@ -435,7 +461,7 @@ function usePlayer(loc, sentences) {
     voiceName,
     setVoiceName,
     note,
-    canPlay: hasAudio || sentences.length > 0,
+    canPlay: hasAudio || (sentences.length > 0 && voices.length > 0),
     play,
     playFrom: (i) => !hasAudio && speakFrom(i),
     toggle,

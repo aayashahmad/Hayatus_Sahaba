@@ -77,10 +77,26 @@ async def main():
     # Filter sentences: a sentence needs at least 8 Urdu/Arabic letter characters
     # to be worth sending to TTS. Punctuation-only sentences ("۔", "!", etc.)
     # and very short garbled fragments are dropped.
+    # Also skip Quranic/Arabic sentences: identified by heavy tashkeel (diacritics
+    # like fatha/kasra/damma/shadda/sukun) — Urdu text almost never uses these,
+    # but Arabic Quranic verses use them on nearly every letter.
+    TASHKEEL = set('ًٌٍَُِّْ'
+                   'ٕٖٓٔٗ٘ٙٚ'
+                   'ٜٟٛٝٞ')
+
     def urdu_letter_count(s):
         return sum(1 for c in s if '؀' <= c <= 'ۿ' and c not in '،؟۔؛')
 
-    good_sentences = [(i, s) for i, s in enumerate(sentences) if urdu_letter_count(s) >= 8]
+    def is_arabic_quran(s):
+        arabic = sum(1 for c in s if '؀' <= c <= 'ۿ')
+        tashkeel = sum(1 for c in s if c in TASHKEEL)
+        # >20% of Arabic-script chars are diacritics → Quranic Arabic, not Urdu
+        return arabic > 0 and tashkeel / arabic > 0.20
+
+    good_sentences = [
+        (i, s) for i, s in enumerate(sentences)
+        if urdu_letter_count(s) >= 8 and not is_arabic_quran(s)
+    ]
 
     if len(good_sentences) < 2 and (not good_sentences or urdu_letter_count(good_sentences[0][1]) < 20):
         print(f"SKIP (garbled/too short) vol{vol}/{page_str}")

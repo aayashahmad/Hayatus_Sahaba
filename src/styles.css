@@ -163,6 +163,15 @@ select {
   color: #1b2b25;
 }
 
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-content {
+  animation: page-in 0.35s ease;
+}
+
 .scan {
   display: block;
   width: 100%;
