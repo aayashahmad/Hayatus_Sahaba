@@ -1,6 +1,5 @@
-// Source scans: https://archive.org/details/hayat-us-sahaba-3volumes
-const ITEM = 'hayat-us-sahaba-3volumes'
-
+// Scans rendered from the archive.org PDFs (https://archive.org/details/hayat-us-sahaba-3volumes)
+// and self-hosted, because archive.org converts JP2 pages on every request and is often slow or down.
 export const VOLUMES = [
   { id: 1, name: 'Volume 1', pages: 649 },
   { id: 2, name: 'Volume 2', pages: 792 },
@@ -9,10 +8,7 @@ export const VOLUMES = [
 
 export const pad = (n) => String(n).padStart(4, '0')
 
-export function scanUrl(vol, page) {
-  const base = `Hayat-us-Sahaba_Vol${vol}`
-  return `https://archive.org/download/${ITEM}/${base}_jp2.zip/${base}_jp2%2F${base}_${pad(page)}.jp2&ext=jpg&reduce=1`
-}
+export const scanUrl = (vol, page) => `/scans/vol${vol}/${pad(page)}.png`
 
 export const textUrl = (vol, page) => `/text/vol${vol}/${pad(page)}.json`
 export const audioUrl = (vol, page) => `/audio/vol${vol}/${pad(page)}.mp3`
