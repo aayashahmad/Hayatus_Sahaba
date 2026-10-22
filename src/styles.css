@@ -183,6 +183,101 @@ select {
   border-inline-start: 5px solid var(--gold);
 }
 
+.scan-viewer {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.scan-viewer .scan {
+  max-width: none;
+  min-height: 0;
+  margin: 0 auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.zoom-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.zbtn,
+.zpct {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 1.1rem;
+  line-height: 1;
+  height: 36px;
+  min-width: 36px;
+  cursor: pointer;
+}
+
+.zpct {
+  min-width: 64px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gold);
+}
+
+.zbtn:hover,
+.zpct:hover {
+  border-color: var(--gold);
+}
+
+.zhint {
+  margin-inline-start: auto;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.scan-viewport {
+  touch-action: pan-x pan-y;
+}
+
+.scan-viewport.zoomed {
+  overflow: auto;
+  height: min(78vh, 1100px);
+  border: 1px solid var(--line);
+  border-inline-start: 5px solid var(--gold);
+  background: #fff;
+  cursor: grab;
+  overscroll-behavior: contain;
+}
+
+.scan-viewport.zoomed .scan {
+  border: 0;
+}
+
+.scan-viewport.zoomed:active {
+  cursor: grabbing;
+}
+
+.scan-viewer.is-full {
+  max-width: none;
+  background: var(--bg);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.scan-viewer.is-full .scan-viewport {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  overflow: auto;
+  background: transparent;
+}
+
+@media (max-width: 600px) {
+  .zhint {
+    display: none;
+  }
+}
+
 .note {
   margin: 0 0 12px;
   padding: 10px 14px;

@@ -9,6 +9,7 @@ export const VOLUMES = [
 export const pad = (n) => String(n).padStart(4, '0')
 
 export const scanUrl = (vol, page) => `/scans/vol${vol}/${pad(page)}.png`
+export const scanUrlHd = (vol, page) => `/scans-hd/vol${vol}/${pad(page)}.png`
 
 export const textUrl = (vol, page) => `/text/vol${vol}/${pad(page)}.json`
 export const audioUrl = (vol, page) => `/audio/vol${vol}/${pad(page)}.mp3`

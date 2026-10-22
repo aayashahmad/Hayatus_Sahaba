@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { VOLUMES, audioUrl, scanUrl, splitSentences, textUrl } from "./book.js";
+import { VOLUMES, audioUrl, scanUrl, scanUrlHd, splitSentences, textUrl } from "./book.js";
+import ScanViewer from "./ScanViewer.jsx";
 
 const STORE_KEY = "hayatus-sahaba:last";
 
@@ -201,10 +202,10 @@ export default function App() {
                 page.
               </p>
             )}
-            <img
+            <ScanViewer
               key={`${loc.vol}-${loc.page}`}
-              className="scan"
               src={scanUrl(loc.vol, loc.page)}
+              hdSrc={scanUrlHd(loc.vol, loc.page)}
               alt={`${volume.name}, page ${loc.page}`}
             />
           </>
