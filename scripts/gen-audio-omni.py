@@ -19,13 +19,23 @@ from omnivoice import OmniVoice
 
 OUT_ROOT = pathlib.Path("audio-omni")
 SR, SENT_GAP = 24000, 0.45
-TRIES, ACCEPT, SPEED = 4, 0.9, 0.95
+TRIES, ACCEPT, SPEED = 2, 0.9, 0.95
 INSTRUCT = "male, middle-aged, low pitch"
 ASR = "mlx-community/whisper-large-v3-turbo"
 VOICE_REF = OUT_ROOT / "narrator.wav"  # chosen once, reused for every page so the voice never changes
 
 SPEAK = [("ﷺ", " صلی اللہ علیہ وسلم "), ("ؐ", " صلی اللہ علیہ وسلم "),
          ("ؓ", " رضی اللہ عنہ "), ("ؒ", " رحمۃ اللہ علیہ "), ("ؑ", " علیہ السلام ")]
+# Pages whose text came from OCR and is unreliable (same lists as gen-audio-all.sh): no audio, the app shows the scan.
+OCR_BLOCKS = {
+    1: "13-13 16-16 36-47 72-83 108-119 156-179 204-215 231-251 253-263 300-311 324-335 348-359 468-479 504-539 564-575 588-599 636-647",
+    2: "15-15 120-131 144-155 216-227 276-299 324-335 420-443 480-491 516-527 552-563 588-599 660-671 684-719",
+    3: "16-16 96-107 120-131 148-155 192-203 216-251 324-335 348-359 372-383 408-419 432-443 456-467",
+}
+
+def is_ocr_page(vol, page):
+    return any(int(a) <= page <= int(b) for a, b in (r.split("-") for r in OCR_BLOCKS[vol].split()))
+
 TASHKEEL = set("ًٌٍَُِّْ" "ٕٖٓٔٗ٘ٙٚ" "ٜٟٛٝٞ")
 
 
@@ -113,7 +123,7 @@ def main():
 
     for vol in vols:
         pages = sorted(int(p.stem) for p in pathlib.Path(f"public/audio/vol{vol}").glob("*.mp3"))
-        pages = [p for p in pages if (lo is None or p >= lo) and (hi is None or p <= hi)]
+        pages = [p for p in pages if (lo is None or p >= lo) and (hi is None or p <= hi) and not is_ocr_page(vol, p)]
         (OUT_ROOT / f"vol{vol}").mkdir(exist_ok=True)
         for i, page in enumerate(pages):
             out_mp3 = OUT_ROOT / f"vol{vol}" / f"{page:04d}.mp3"
