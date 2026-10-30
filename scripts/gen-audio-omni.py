@@ -147,7 +147,9 @@ def main():
                     review.write(f"{vol}\t{page}\t{k + 1}\t{c:.2f}\t{s}\n"); review.flush()
             wav = out_mp3.with_suffix(".wav")
             sf.write(wav, np.concatenate(chunks[:-1]).astype(np.float32), SR)
-            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(wav), "-ac", "1", "-b:a", "48k", str(out_mp3)], check=True)
+            # -nostdin: a background ffmpeg that touches the terminal gets stopped (SIGTTIN) and the batch hangs.
+            subprocess.run(["ffmpeg", "-nostdin", "-y", "-loglevel", "error", "-i", str(wav), "-ac", "1", "-b:a", "48k", str(out_mp3)],
+                           check=True, stdin=subprocess.DEVNULL)
             wav.unlink()
             json.dump(timing, open(out_mp3.with_suffix(".json"), "w"))
             print(f"vol{vol} {page:04d}  [{i + 1}/{len(pages)}]  {len(sents)} sentences, {weak} to review, {time.time() - t0:.0f}s", flush=True)
