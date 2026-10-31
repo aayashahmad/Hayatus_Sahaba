@@ -9,7 +9,7 @@ publish() {
     [ -e "$mp3" ] || continue
     json="${mp3%.mp3}.json"
     [ -f "$json" ] || continue            # page still being written
-    dest="public/${mp3#audio-omni/}"
+    dest="public/audio/${mp3#audio-omni/}"
     [ -d "$(dirname "$dest")" ] || continue
     if ! cmp -s "$mp3" "$dest" || ! cmp -s "$json" "${dest%.mp3}.json"; then
       cp "$mp3" "$json" "$(dirname "$dest")/"; n=$((n + 1))
