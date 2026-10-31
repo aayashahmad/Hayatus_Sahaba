@@ -158,6 +158,13 @@ select {
   background: rgba(201, 169, 97, 0.14);
 }
 
+/* Quran/Arabic passages */
+.text span.ayah {
+  color: var(--gold);
+  background: rgba(201, 169, 97, 0.08);
+  border-radius: 0;
+}
+
 .text span.word {
   background: var(--gold);
   color: #1b2b25;

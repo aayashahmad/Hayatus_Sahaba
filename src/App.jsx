@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { VOLUMES, audioUrl, scanUrl, scanUrlHd, splitSentences, textUrl } from "./book.js";
+import { VOLUMES, arabicFlags, audioUrl, scanUrl, scanUrlHd, splitSentences, textUrl } from "./book.js";
 import ScanViewer from "./ScanViewer.jsx";
 
 const STORE_KEY = "hayatus-sahaba:last";
@@ -84,6 +84,7 @@ export default function App() {
       const items = splitSentences(heading ? p.slice(2) : p).map((s) => ({
         s,
         i: i++,
+        ayah: arabicFlags(s.split(" ")),
       }));
       return { heading, items };
     });
@@ -214,7 +215,7 @@ export default function App() {
             <article className="text" lang="ur" dir="rtl">
               {blocks.map((block, b) => (
                 <p key={b} className={block.heading ? "heading" : ""}>
-                  {block.items.map(({ s, i }) => (
+                  {block.items.map(({ s, i, ayah }) => (
                     <span
                       key={i}
                       className={player.current === i ? "speaking" : ""}
@@ -223,11 +224,10 @@ export default function App() {
                       {s.split(" ").map((w, k) => (
                         <span
                           key={k}
-                          className={
-                            player.current === i && player.word === k
-                              ? "word"
-                              : ""
-                          }
+                          className={[
+                            ayah[k] ? "ayah" : "",
+                            player.current === i && player.word === k ? "word" : "",
+                          ].join(" ").trim()}
                         >
                           {w}{" "}
                         </span>

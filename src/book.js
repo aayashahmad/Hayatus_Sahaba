@@ -21,3 +21,33 @@ export function splitSentences(text) {
     .map((s) => s.trim())
     .filter(Boolean)
 }
+
+// Quran/Arabic passages: a word is Arabic when at least half its letters carry harakat, and a run of two
+// or more such words counts. Same rule as arabic_flags() in scripts/gen-audio-omni.py, which voices these
+// runs with the Arabic model. Only styling depends on this; the text itself is never changed.
+const MARK = /[ً-ٰٟۡ-ۭ]/g
+const LETTER = /[ء-يٱ-ۓ]/g
+
+function wordKind(w) {
+  const letters = (w.match(LETTER) ?? []).length
+  const marks = (w.match(MARK) ?? []).length
+  if (!letters) return 'n'
+  return marks && marks / letters >= 0.5 ? 'a' : 'u'
+}
+
+export function arabicFlags(words) {
+  const kinds = words.map(wordKind)
+  const flags = words.map(() => false)
+  let i = 0
+  while (i < words.length) {
+    if (kinds[i] !== 'a') { i++; continue }
+    let j = i, count = 0, last = i
+    while (j < words.length && kinds[j] !== 'u') {
+      if (kinds[j] === 'a') { count++; last = j }
+      j++
+    }
+    if (count >= 2) for (let x = i; x <= last; x++) flags[x] = true
+    i = last + 1
+  }
+  return flags
+}
