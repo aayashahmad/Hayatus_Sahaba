@@ -44,6 +44,7 @@ print(' '.join(str(p) for p in pages))
     PSTR=$(printf '%04d' "$PAGE")
     MP3="public/audio/vol${VOL}/${PSTR}.mp3"
     [ -s "$MP3" ] && { echo "skip vol${VOL}/${PSTR}"; continue; }
+    is_ocr_page "$VOL" "$PAGE" && { echo "skip vol${VOL}/${PSTR} (OCR)"; continue; }
     [ -f "public/audio/vol${VOL}/${PSTR}.skip" ] && { echo "skip vol${VOL}/${PSTR} (garbled)"; continue; }
     echo "gen  vol${VOL}/${PSTR}"
     python3 scripts/gen-audio-page.py "$VOL" "$PAGE" 2>&1 | grep -v '^\[' | head -3
