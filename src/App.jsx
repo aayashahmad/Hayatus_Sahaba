@@ -167,29 +167,13 @@ export default function App() {
               </option>
             ))}
           </select>
-          {player.voices.length > 1 && (
-            <select
-              value={player.voiceName}
-              onChange={(e) => player.setVoiceName(e.target.value)}
-              aria-label="Voice"
-            >
-              {player.voices.map((v) => (
-                <option key={v.name} value={v.name}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-          )}
         </div>
       </div>
 
-      {player.note && <p className="note">{player.note}</p>}
-      {!player.canPlay && hasText && (
+      {player.noAudio && hasText && (
         <p className="note">
-          🔇 Listen is not available for this page.{" "}
-          {player.voices.length === 0
-            ? "Your browser has no Urdu voice — open in Microsoft Edge or Android Chrome."
-            : "This page's audio recording is not ready yet."}
+          🔇 Listen is not available for this page. This page's audio
+          recording is not ready yet.
         </p>
       )}
 
@@ -286,52 +270,29 @@ export default function App() {
   );
 }
 
-// Plays a recorded recitation (public/audio/volN/NNNN.mp3) when one exists,
-// otherwise reads the page text with the device's Urdu voice.
+// Plays the page's OmniVoice recording (public/audio/volN/NNNN.mp3 + NNNN.json sentence timing).
+// There is no device-voice fallback: pages without a recording have no Listen.
 function usePlayer(loc, sentences, onPageEnd) {
   const [state, setState] = useState("idle"); // 'idle' | 'playing' | 'paused'
   const [current, setCurrent] = useState(-1);
   const [word, setWord] = useState(-1);
   const [rate, setRate] = useState(1);
-  const [voices, setVoices] = useState([]);
-  const [voiceName, setVoiceName] = useState("");
-  const [hasAudio, setHasAudio] = useState(false);
+  const [hasAudio, setHasAudio] = useState(null); // null while checking
   const [timing, setTiming] = useState(null); // [{s, d}] per sentence
-  const [note, setNote] = useState("");
   const audioRef = useRef(null);
-  const runRef = useRef(0);
-  const synth = typeof window !== "undefined" ? window.speechSynthesis : null;
-
-  useEffect(() => {
-    if (!synth) return;
-    const load = () => {
-      const ur = synth
-        .getVoices()
-        .filter((v) => v.lang.toLowerCase().startsWith("ur"));
-      setVoices(ur);
-      setVoiceName((n) => n || ur[0]?.name || "");
-    };
-    load();
-    synth.addEventListener("voiceschanged", load);
-    return () => synth.removeEventListener("voiceschanged", load);
-  }, [synth]);
 
   const stop = useCallback(() => {
-    runRef.current++;
-    synth?.cancel();
     audioRef.current?.pause();
     audioRef.current = null;
     setState("idle");
     setCurrent(-1);
     setWord(-1);
-    setNote("");
-  }, [synth]);
+  }, []);
 
   // Stop on page change and look for a recording of the new page.
   useEffect(() => {
     stop();
-    setNote("");
-    setHasAudio(false);
+    setHasAudio(null);
     setTiming(null);
     let cancelled = false;
     const mp3 = audioUrl(loc.vol, loc.page);
@@ -341,15 +302,14 @@ function usePlayer(loc, sentences, onPageEnd) {
         const ok = r.ok && (r.headers.get("content-type") || "").startsWith("audio");
         setHasAudio(ok);
         if (ok) {
-          // Try to load sentence-timing JSON alongside the MP3.
-          const timingUrl = mp3.replace(/\.mp3$/, ".json");
-          fetch(timingUrl)
-            .then((r2) => r2.ok ? r2.json() : null)
+          // Sentence timing JSON alongside the MP3, for highlighting and tap-to-play.
+          fetch(mp3.replace(/\.mp3$/, ".json"))
+            .then((r2) => (r2.ok ? r2.json() : null))
             .then((t) => { if (!cancelled) setTiming(t); })
             .catch(() => {});
         }
       })
-      .catch(() => {});
+      .catch(() => { if (!cancelled) setHasAudio(false); });
     return () => {
       cancelled = true;
     };
@@ -357,48 +317,13 @@ function usePlayer(loc, sentences, onPageEnd) {
 
   useEffect(() => stop, [stop]);
 
-  const speakFrom = useCallback(
-    (start) => {
-      if (sentences.length === 0) return;
-      const voice = voices.find((v) => v.name === voiceName) ?? voices[0];
-      if (!synth || !voice) {
-        setNote(
-          "This device has no Urdu voice. Open the app in Microsoft Edge or Android Chrome, or add a recording for this page.",
-        );
-        return;
-      }
-      stop();
-      const run = runRef.current;
-      setState("playing");
-      // One utterance per sentence: long utterances get cut off in Chrome.
-      const next = (i) => {
-        if (run !== runRef.current) return;
-        if (i >= sentences.length) { stop(); onPageEnd?.(); return; }
-        setCurrent(i);
-        setWord(-1);
-        const u = new SpeechSynthesisUtterance(sentences[i]);
-        u.voice = voice;
-        u.lang = voice.lang;
-        u.rate = rate;
-        // Word boundaries arrive as character offsets into the sentence.
-        u.onboundary = (e) => {
-          if (run !== runRef.current || (e.name && e.name !== "word")) return;
-          setWord(sentences[i].slice(0, e.charIndex).split(" ").length - 1);
-        };
-        u.onend = () => next(i + 1);
-        u.onerror = () => run === runRef.current && stop();
-        synth.speak(u);
-      };
-      next(start);
-    },
-    [synth, voices, voiceName, rate, sentences, stop, onPageEnd],
-  );
-
-  const play = useCallback(() => {
-    if (!hasAudio) return speakFrom(0);
+  // Play from sentence `start` (0 = top of the page).
+  const play = useCallback((start = 0) => {
+    if (!hasAudio) return;
     stop();
     const a = new Audio(audioUrl(loc.vol, loc.page));
     a.playbackRate = rate;
+    if (start > 0 && timing?.[start]) a.currentTime = timing[start].s;
     a.onended = () => { stop(); onPageEnd?.(); };
     // Word-level highlighting using sentence timing JSON.
     if (timing && timing.length > 0) {
@@ -417,7 +342,7 @@ function usePlayer(loc, sentences, onPageEnd) {
           const relT = Math.max(0, t - entry.s);
           // Weight each word by its character count — longer words take more time.
           const charCounts = words.map((w) => Math.max(1, w.length));
-          const total = charCounts.reduce((a, b) => a + b, 0);
+          const total = charCounts.reduce((x, y) => x + y, 0);
           let cum = 0;
           let wi = words.length - 1;
           for (let j = 0; j < words.length; j++) {
@@ -435,18 +360,19 @@ function usePlayer(loc, sentences, onPageEnd) {
     a.play()
       .then(() => setState("playing"))
       .catch(stop);
-  }, [hasAudio, speakFrom, stop, loc, rate, timing, sentences, onPageEnd]);
+  }, [hasAudio, stop, loc, rate, timing, sentences, onPageEnd]);
 
   const toggle = useCallback(() => {
     const a = audioRef.current;
+    if (!a) return;
     if (state === "playing") {
-      a ? a.pause() : synth.pause();
+      a.pause();
       setState("paused");
     } else {
-      a ? a.play() : synth.resume();
+      a.play();
       setState("playing");
     }
-  }, [state, synth]);
+  }, [state]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = rate;
@@ -458,13 +384,10 @@ function usePlayer(loc, sentences, onPageEnd) {
     word,
     rate,
     setRate,
-    voices,
-    voiceName,
-    setVoiceName,
-    note,
-    canPlay: hasAudio || (sentences.length > 0 && voices.length > 0),
-    play,
-    playFrom: (i) => !hasAudio && speakFrom(i),
+    canPlay: hasAudio === true,
+    noAudio: hasAudio === false,
+    play: () => play(0),
+    playFrom: (i) => play(i),
     toggle,
     stop,
   };
