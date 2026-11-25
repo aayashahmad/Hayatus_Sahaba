@@ -16,6 +16,8 @@ publish() {
     fi
   done
   if [ "$n" -gt 0 ]; then
+    # Fingerprints of every page, so the mobile app re-downloads only the pages that changed.
+    python3 scripts/audio-manifest.py >/dev/null
     git add public/audio && git commit -q -m "OmniVoice narration: $n more pages" && git push -q origin main \
       && echo "$(date '+%F %T') published $n pages" || echo "$(date '+%F %T') push failed"
   else
